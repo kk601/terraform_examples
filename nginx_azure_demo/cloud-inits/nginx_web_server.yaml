@@ -1,0 +1,31 @@
+## template: jinja
+#cloud-config
+package_upgrade: true
+packages:
+  - nginx
+
+write_files:
+  - path: /usr/share/nginx/mysite/index.html
+    content: |
+      <h2>Hello from HOST</h2>
+
+  - owner: www-data:www-data
+    path: /etc/nginx/sites-available/mysite
+    content: |
+      server {
+        listen 80 default_server;
+
+        root /usr/share/nginx/mysite/;
+        index index.html index.htm;
+
+        server_name _;
+        location / {
+          try_files $uri $uri/ =404;
+        }
+      }
+
+runcmd:
+  - sudo unlink /etc/nginx/sites-enabled/default
+  - sudo ln -s /etc/nginx/sites-available/mysite /etc/nginx/sites-enabled/mysite
+  - sudo sed -i "s/HOST/{{ v1.local_hostname }}/" /usr/share/nginx/mysite/index.html
+  - sudo systemctl reload nginx

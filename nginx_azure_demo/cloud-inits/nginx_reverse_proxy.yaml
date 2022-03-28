@@ -1,0 +1,24 @@
+#cloud-config
+package_upgrade: true
+packages:
+  - nginx
+
+write_files:
+  - owner: www-data:www-data
+    path: /etc/nginx/conf.d/reverse_proxy.conf
+    content: |
+      upstream web_servers{
+        server web-server-0;
+        server web-server-1;
+      }
+      server {
+        listen 80;
+
+        location / {
+          proxy_pass http://web_servers;
+        }
+      }
+
+runcmd:
+  - sudo unlink /etc/nginx/sites-enabled/default
+  - sudo systemctl reload nginx
