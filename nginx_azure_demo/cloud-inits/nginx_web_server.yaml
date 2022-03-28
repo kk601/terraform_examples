@@ -7,7 +7,7 @@ packages:
 write_files:
   - path: /usr/share/nginx/mysite/index.html
     content: |
-      <h2>Hello from HOST!</h2>
+      <h2>Hello from HOST</h2>
 
   - owner: www-data:www-data
     path: /etc/nginx/sites-available/mysite
