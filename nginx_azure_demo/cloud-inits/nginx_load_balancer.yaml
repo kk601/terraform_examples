@@ -5,7 +5,7 @@ packages:
 
 write_files:
   - owner: www-data:www-data
-    path: /etc/nginx/conf.d/reverse_proxy.conf
+    path: /etc/nginx/conf.d/load_balancer.conf
     content: |
       upstream web_servers{
         server web-server-0;
@@ -20,5 +20,5 @@ write_files:
       }
 
 runcmd:
-  - sudo unlink /etc/nginx/sites-enabled/default
-  - sudo systemctl reload nginx
+  - unlink /etc/nginx/sites-enabled/default
+  - systemctl reload nginx

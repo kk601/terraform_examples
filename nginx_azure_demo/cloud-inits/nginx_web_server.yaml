@@ -2,30 +2,94 @@
 #cloud-config
 package_upgrade: true
 packages:
-  - nginx
+  - build-essential
+  - libssl-dev
+  - libpcre3-dev
+  - zlib1g-dev
 
 write_files:
   - path: /usr/share/nginx/mysite/index.html
     content: |
       <h2>Hello from HOST!</h2>
+      
+  - path: /etc/systemd/system/nginx.service
+    content: |
+      [Unit]
+      Description=The NGINX HTTP and reverse proxy server
+      After=syslog.target network-online.target remote-fs.target nss-lookup.target
+      Wants=network-online.target
 
+      [Service]
+      Type=forking
+      PIDFile=/run/nginx.pid
+      ExecStartPre=/usr/sbin/nginx -t
+      ExecStart=/usr/sbin/nginx
+      ExecReload=/usr/sbin/nginx -s reload
+      ExecStop=/bin/kill -s QUIT $MAINPID
+      PrivateTmp=true
+
+      [Install]
+      WantedBy=multi-user.target
+    
   - owner: www-data:www-data
     path: /etc/nginx/sites-available/mysite
     content: |
       server {
         listen 80 default_server;
 
+        access_log /var/log/nginx/access.log;
+        error_log /var/log/nginx/error.log;
+
         root /usr/share/nginx/mysite/;
         index index.html index.htm;
 
-        server_name _;
+        server_name web_server;
         location / {
           try_files $uri $uri/ =404;
         }
       }
+  - path: /etc/nginx/nginx.conf
+    content: |
+      user  www-data;
+      worker_processes  auto;
+      pid /run/nginx.pid;
+      include /etc/nginx/modules-enabled/*;
+
+      events {
+        worker_connections  1024;
+      }
+      http {
+        include       mime.types;
+        default_type  application/octet-stream;
+        keepalive_timeout  65;
+        gzip  on;
+        vhost_traffic_status_zone;
+
+        include /etc/nginx/conf.d/*.conf;
+        include /etc/nginx/sites-enabled/*;
+
+        server {
+          listen 9089;
+          server_name nginx_web_server_metrics;
+
+          location / {
+            vhost_traffic_status_display;
+            vhost_traffic_status_display_format prometheus;
+          }
+        }
+      }
 
 runcmd:
-  - sudo unlink /etc/nginx/sites-enabled/default
-  - sudo ln -s /etc/nginx/sites-available/mysite /etc/nginx/sites-enabled/mysite
-  - sudo sed -i "s/HOST/{{ v1.local_hostname }}/" /usr/share/nginx/mysite/index.html
-  - sudo systemctl reload nginx
+  - wget http://nginx.org/download/nginx-1.21.6.tar.gz
+  - git clone https://github.com/vozlt/nginx-module-vts.git
+  - tar -zxvf nginx-*.tar.gz
+  - cd nginx-1*/
+  - ./configure --prefix=/var/www/html --sbin-path=/usr/sbin/nginx --conf-path=/etc/nginx/nginx.conf --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log --lock-path=/var/lock/nginx.lock --pid-path=/run/nginx.pid --modules-path=/usr/lib/nginx/modules --with-debug --with-compat --with-pcre-jit --with-http_ssl_module --with-http_stub_status_module --with-http_realip_module --with-http_auth_request_module --with-http_v2_module --with-http_dav_module --with-http_slice_module --with-threads --with-http_addition_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_sub_module --with-stream=dynamic --with-stream_ssl_module --with-mail=dynamic --with-mail_ssl_module --add-module=/nginx-module-vts/
+  - make
+  - make install
+  - mkdir /etc/nginx/sites-enabled/
+  - ln -s /etc/nginx/sites-available/mysite /etc/nginx/sites-enabled/mysite
+  - sed -i "s/HOST/{{ v1.local_hostname }}/" /usr/share/nginx/mysite/index.html
+  - systemctl start nginx
+
+output: { all: "| tee -a /var/log/nginx-demo.log" }

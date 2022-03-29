@@ -4,6 +4,6 @@ output "nginx_public_ip" {
 output "nginx_dns_name" {
   value = module.nginx.public_ip_dns_name
 }
-output "internal_web_servers_password" {
+output "servers_password" {
   value = nonsensitive(random_password.password.result)
 }
