@@ -73,6 +73,8 @@ write_files:
           server_name nginx_web_server_metrics;
 
           location / {
+            vhost_traffic_status_bypass_limit on;
+            vhost_traffic_status_bypass_stats on;
             vhost_traffic_status_display;
             vhost_traffic_status_display_format prometheus;
           }
@@ -91,5 +93,6 @@ runcmd:
   - ln -s /etc/nginx/sites-available/mysite /etc/nginx/sites-enabled/mysite
   - sed -i "s/HOST/{{ v1.local_hostname }}/" /usr/share/nginx/mysite/index.html
   - systemctl start nginx
+  - systemctl enable nginx
 
 output: { all: "| tee -a /var/log/nginx-demo.log" }
