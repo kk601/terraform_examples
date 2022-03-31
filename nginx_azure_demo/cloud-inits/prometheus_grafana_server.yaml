@@ -1,5 +1,7 @@
 #cloud-config
 package_upgrade: true
+packages:
+  - libfontconfig1
 
 write_files:
   - path: /etc/systemd/system/prometheus.service
@@ -28,14 +30,33 @@ write_files:
         scrape_interval: 15s
 
       scrape_configs:
-        - job_name: 'Web_servers_metric'
+        - job_name: 'Web-servers-metrics'
           scrape_interval: 5s
           static_configs:
-            - targets: ['web-server-0:9089','web-server-1:9089']
-  
+            - targets: ['web-server-0:80','web-server-1:80']
+
+        - job_name: 'Load-balancer-metrics'
+          scrape_interval: 5s
+          static_configs: 
+            - targets: ['load-balancer-server-0:80']
+
+  - path: /etc/grafana/provisioning/datasources/datasource.yaml
+    content: |
+      apiVersion: 1
+
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://localhost:9090
+          jsonData:
+            httpMethod: POST
+
 runcmd:
   - useradd --no-create-home --shell /bin/false prometheus
   - wget https://github.com/prometheus/prometheus/releases/download/v2.34.0/prometheus-2.34.0.linux-amd64.tar.gz
+  - wget https://dl.grafana.com/oss/release/grafana_8.4.4_amd64.deb
+  - dpkg -i grafana_*_amd64.deb
   - tar xvfz prometheus-*.tar.gz
   - mkdir /var/lib/prometheus
   - chown -R prometheus:prometheus /var/lib/prometheus/
@@ -47,7 +68,7 @@ runcmd:
   - cp -r  prometheus-*/consoles /etc/prometheus/
   - chown -R prometheus:prometheus /etc/prometheus/console_libraries
   - chown -R prometheus:prometheus /etc/prometheus/consoles
-  - systemctl start prometheus
-  - systemctl enable prometheus
+  - systemctl start prometheus grafana-server
+  - systemctl enable prometheus grafana-server
 
 output: { all: "| tee -a /var/log/nginx-demo.log" }

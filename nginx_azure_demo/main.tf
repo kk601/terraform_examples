@@ -109,7 +109,7 @@ module "prometheus_grafana_server" {
   vm_os_offer                   = "0001-com-ubuntu-server-focal"
   vm_os_sku                     = "20_04-lts-gen2"
   data_sa_type                  = "Standard_LRS"
-  remote_port                   = "9090"
+  remote_port                   = "3000"
   vm_size                       = "Standard_DS1_v2"
   vnet_subnet_id                = module.vnet.vnet_subnets[0]
   custom_data                   = file("./cloud-inits/prometheus_grafana_server.yaml")
@@ -118,18 +118,4 @@ module "prometheus_grafana_server" {
   admin_password                = random_password.password.result
 
   depends_on = [azurerm_resource_group.nginx_demo]
-}
-
-resource "azurerm_network_security_rule" "allow_ssh_nsg_rule" {
-  name                        = "allow_ssh_bastion"
-  resource_group_name         = azurerm_resource_group.nginx_demo.name
-  network_security_group_name = module.nginx.network_security_group_name
-  priority                    = 100
-  direction                   = "Inbound"
-  access                      = "Allow"
-  protocol                    = "Tcp"
-  destination_port_range      = "22"
-  source_port_range           = "*"
-  source_address_prefix       = "10.0.1.0/27"
-  destination_address_prefix  = "*"
 }

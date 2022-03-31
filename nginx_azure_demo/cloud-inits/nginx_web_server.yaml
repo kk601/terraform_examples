@@ -47,6 +47,12 @@ write_files:
         location / {
           try_files $uri $uri/ =404;
         }
+        location /metrics {
+            vhost_traffic_status_bypass_limit on;
+            vhost_traffic_status_bypass_stats on;
+            vhost_traffic_status_display;
+            vhost_traffic_status_display_format prometheus;
+          }
       }
   - path: /etc/nginx/nginx.conf
     content: |
@@ -67,18 +73,6 @@ write_files:
 
         include /etc/nginx/conf.d/*.conf;
         include /etc/nginx/sites-enabled/*;
-
-        server {
-          listen 9089;
-          server_name nginx_web_server_metrics;
-
-          location / {
-            vhost_traffic_status_bypass_limit on;
-            vhost_traffic_status_bypass_stats on;
-            vhost_traffic_status_display;
-            vhost_traffic_status_display_format prometheus;
-          }
-        }
       }
 
 runcmd:
