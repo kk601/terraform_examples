@@ -15,7 +15,7 @@ write_files:
   - path: /etc/systemd/system/nginx.service
     content: |
       [Unit]
-      Description=The NGINX HTTP and reverse proxy server
+      Description=The NGINX HTTP server
       After=syslog.target network-online.target remote-fs.target nss-lookup.target
       Wants=network-online.target
 
@@ -27,6 +27,24 @@ write_files:
       ExecReload=/usr/sbin/nginx -s reload
       ExecStop=/bin/kill -s QUIT $MAINPID
       PrivateTmp=true
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/node-exporter.service
+    content: |
+      [Unit]
+      Description=Prometheus node metrics exporter
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      User=node-exporter
+      Group=node-exporter
+      Type=simple
+      ExecStart=/usr/local/bin/node_exporter \
+          --web.listen-address=":9100" \
+          --web.telemetry-path="/metrics" 
 
       [Install]
       WantedBy=multi-user.target
@@ -76,9 +94,13 @@ write_files:
       }
 
 runcmd:
+  - useradd --no-create-home --shell /bin/false node-exporter
+  - wget https://github.com/prometheus/node_exporter/releases/download/v1.3.1/node_exporter-1.3.1.linux-amd64.tar.gz
   - wget http://nginx.org/download/nginx-1.21.6.tar.gz
   - git clone https://github.com/vozlt/nginx-module-vts.git
-  - tar -zxvf nginx-*.tar.gz
+  - cat *.tar.gz | tar -xvzf - -i
+  - cp node_exporter-*/node_exporter /usr/local/bin/
+  - chown node-exporter:node-exporter /usr/local/bin/node_exporter
   - cd nginx-1*/
   - ./configure --prefix=/var/www/html --sbin-path=/usr/sbin/nginx --conf-path=/etc/nginx/nginx.conf --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log --lock-path=/var/lock/nginx.lock --pid-path=/run/nginx.pid --modules-path=/usr/lib/nginx/modules --with-debug --with-compat --with-pcre-jit --with-http_ssl_module --with-http_stub_status_module --with-http_realip_module --with-http_auth_request_module --with-http_v2_module --with-http_dav_module --with-http_slice_module --with-threads --with-http_addition_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_sub_module --with-stream=dynamic --with-stream_ssl_module --with-mail=dynamic --with-mail_ssl_module --add-module=/nginx-module-vts/
   - make
@@ -86,7 +108,7 @@ runcmd:
   - mkdir /etc/nginx/sites-enabled/
   - ln -s /etc/nginx/sites-available/mysite /etc/nginx/sites-enabled/mysite
   - sed -i "s/HOST/{{ v1.local_hostname }}/" /usr/share/nginx/mysite/index.html
-  - systemctl start nginx
-  - systemctl enable nginx
+  - systemctl start nginx node-exporter
+  - systemctl enable nginx node-exporter
 
 output: { all: "| tee -a /var/log/nginx-demo.log" }

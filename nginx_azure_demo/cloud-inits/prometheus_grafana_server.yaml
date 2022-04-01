@@ -40,6 +40,11 @@ write_files:
           static_configs: 
             - targets: ['load-balancer-server-0:80']
 
+        - job_name: 'Nodes-metrics'
+          scrape_interval: 5s
+          static_configs: 
+            - targets: ['web-server-0:9100','web-server-1:9100','load-balancer-server-0:9100']
+
   - path: /etc/grafana/provisioning/datasources/datasource.yaml
     content: |
       apiVersion: 1
