@@ -1,0 +1,7 @@
+- hosts: localhost
+
+- name: Ping linux vms
+  import_playbook: ping_linux_vms.yml
+
+- name: Ping windows vms
+  import_playbook: ping_windows_vms.yml

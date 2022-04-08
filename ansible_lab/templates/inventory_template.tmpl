@@ -1,0 +1,18 @@
+[all:vars]
+ansible_user = ${admin_username}
+
+[linux]
+%{ for vm_name, public_ip in linux_vms ~}
+${vm_name} ansible_host=${public_ip}
+%{ endfor ~}
+
+[windows:vars]
+ansible_password = ${win_password}
+ansible_port = 5986
+ansible_connection = winrm
+ansible_winrm_server_cert_validation = ignore
+
+[windows]
+%{ for vm_name, public_ip in windows_vms ~}
+${vm_name} ansible_host=${public_ip}
+%{ endfor ~}

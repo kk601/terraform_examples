@@ -1,0 +1,11 @@
+- hosts:
+    - linux
+    
+  vars:
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+
+  tasks: 
+  - name: "run ping"
+    ping:
+      
+      
