@@ -1,4 +1,5 @@
 - hosts: localhost
+  gather_facts: no
 
 - name: Ping linux vms
   import_playbook: ping_linux_vms.yml

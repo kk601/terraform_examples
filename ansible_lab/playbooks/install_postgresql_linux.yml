@@ -1,0 +1,153 @@
+- hosts: localhost
+  tags: always
+  gather_facts: no
+  vars_prompt:
+    - name: target_host
+      prompt: Enter target hostname or ip address
+      private: no
+  tasks:
+    - name: "Create dynamic group with target host"
+      add_host:
+        name: "{{ target_host }}"
+        groups: target_group
+
+- hosts: target_group
+  become: yes
+  vars:
+    Import_test_db: no
+    Install_pgbackup: no
+    Pgbackup_cloud_drivers_support: no
+    test_db_name: "test_db"
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+  tasks:
+    - name: "Test conectivity"
+      ping:
+
+    - name: Install postgresql
+      tags: Linux-postgresql-install
+      block:
+      - name: Add postgresql repository signing key
+        apt_key:
+          url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          state: present
+
+      - name: Add postgresql repository into apt sources list
+        apt_repository:
+          repo: deb http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main
+          state: present
+
+      - name: "Update repositories cache and install packages"
+        apt: 
+          pkg:
+            - postgresql
+            - postgresql-client
+            - python3-pip
+            - acl
+          update_cache: yes
+
+      - name: Install reqiured python package for postgreSQL managment
+        pip:
+          name: psycopg2-binary
+
+    - name: Install latest release of pgbackup tool(optional) #Tool for pg database backup https://github.com/kk601/pgbackup
+      when: Install_pgbackup == "yes"
+      tags: Linux-pgbackup-install
+      block:
+      - name: Get info about installed pip packages
+        pip_package_info:
+        register: pip_packages
+            
+      - name: Download and install pgbackup if not present
+        when: '"pgbackup" not in pip_packages.packages.pip'
+        block:
+        - name: Get info about latest relase version from github api
+          uri:
+            url: https://api.github.com/repos/kk601/pgbackup/releases/latest
+            return_content: yes
+          register: json_response
+        - name: Download tarball with latest release
+          get_url:
+            url: "{{ json_response.json.tarball_url }}"
+            dest: /tmp/pgbackup.tar.gz
+
+        - name: Install pgbackup tool with pip
+          pip:
+            name: file:///tmp/pgbackup.tar.gz
+            state: latest
+
+    - name: Create test database(optional)
+      when: Import_test_db == "yes"
+      tags: Import-testdb
+      block:
+      - name: Copy sql file from local machine
+        copy:
+          src: sample_db.sql
+          dest: /tmp
+
+      - name: Grant local postgres user access to postgresql server
+        community.postgresql.postgresql_pg_hba:
+          dest: /etc/postgresql/14/main/pg_hba.conf
+          contype: local
+          databases: all
+          users: postgres
+          method: trust
+          create: true
+
+      - name: Reload postgres server to load new configuration
+        service:
+          name: postgresql
+          state: reloaded
+
+      - name: Create database
+        community.postgresql.postgresql_db:
+          name: "{{ test_db_name }}"
+        notify: 
+          - Import test_db
+
+    - name: Install Aws/Azure cli (optional for azure blob storage driver, reqiured for aws s3 driver)
+      when: Pgbackup_cloud_drivers_support == "yes"
+      tags: Pgbackup-cloud-drivers-support
+      block:
+      - name: Install unzip
+        apt: 
+          name: unzip
+      
+      - name: Gather facts about installed packages
+        package_facts:
+          manager: auto
+
+      - name: Download and install azure cli if not present
+        when: '"azure-cli" not in ansible_facts.packages'
+        block:
+        - name: Download script for azure cli instalation
+          get_url:
+            url: https://aka.ms/InstallAzureCLIDeb
+            dest: /tmp/
+            mode: '755'
+            
+        - name: Execute azure cli installer
+          shell: /tmp/deb_install.sh
+
+      - name: Check if aws cli is installed 
+        stat:
+          path: /usr/local/bin/aws
+        register: aws_check
+
+      - name: Download and install aws cli if not present
+        when: not aws_check.stat.exists
+        block:
+        - name: Download and unarchive AWS cli installer
+          unarchive:
+            src: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+            dest: /tmp
+            remote_src: yes
+
+        - name: Execute aws cli installer
+          shell: /tmp/aws/install
+          register: command_result
+          failed_when: "'Found preexisting AWS CLI installation' not in command_result.stderr and command_result.rc == 1"  
+
+  handlers:
+  - name: Import test_db
+    become_user: postgres 
+    shell: psql -U postgres {{ test_db_name }} < /tmp/sample_db.sql
