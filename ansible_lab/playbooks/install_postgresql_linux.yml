@@ -37,7 +37,7 @@
           state: present
 
       - name: "Update repositories cache and install packages"
-        apt: 
+        apt:
           pkg:
             - postgresql
             - postgresql-client
@@ -56,7 +56,7 @@
       - name: Get info about installed pip packages
         pip_package_info:
         register: pip_packages
-            
+
       - name: Download and install pgbackup if not present
         when: '"pgbackup" not in pip_packages.packages.pip'
         block:
@@ -101,7 +101,7 @@
       - name: Create database
         community.postgresql.postgresql_db:
           name: "{{ test_db_name }}"
-        notify: 
+        notify:
           - Import test_db
 
     - name: Install Aws/Azure cli (optional for azure blob storage driver, reqiured for aws s3 driver)
@@ -109,9 +109,9 @@
       tags: Pgbackup-cloud-drivers-support
       block:
       - name: Install unzip
-        apt: 
+        apt:
           name: unzip
-      
+
       - name: Gather facts about installed packages
         package_facts:
           manager: auto
@@ -124,11 +124,11 @@
             url: https://aka.ms/InstallAzureCLIDeb
             dest: /tmp/
             mode: '755'
-            
+
         - name: Execute azure cli installer
           shell: /tmp/deb_install.sh
 
-      - name: Check if aws cli is installed 
+      - name: Check if aws cli is installed
         stat:
           path: /usr/local/bin/aws
         register: aws_check
@@ -145,9 +145,8 @@
         - name: Execute aws cli installer
           shell: /tmp/aws/install
           register: command_result
-          failed_when: "'Found preexisting AWS CLI installation' not in command_result.stderr and command_result.rc == 1"  
+          failed_when: "'Found preexisting AWS CLI installation' not in command_result.stderr and command_result.rc == 1"
 
   handlers:
   - name: Import test_db
-    become_user: postgres 
     shell: psql -U postgres {{ test_db_name }} < /tmp/sample_db.sql
